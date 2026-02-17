@@ -1,15 +1,7 @@
 output "cluster_name" {
-  value = aws_eks_cluster.devopsshack.name
-}
-
-output "node_group" {
-  value = aws_eks_node_group.devopsshack.node_group_name
+  value = aws_eks_cluster.eks.name
 }
 
 output "vpc_id" {
-  value = aws_vpc.devopsshack_vpc.id
-}
-
-output "subnets" {
-  value = aws_subnet.devopsshack_subnet[*].id
+  value = aws_vpc.eks_vpc.id
 }
