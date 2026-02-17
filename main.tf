@@ -155,4 +155,67 @@ resource "aws_iam_role_policy_attachment" "node_ecr" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
 }
 
-resource "aws_iam_role_polic_
+resource "aws_iam_role_policy_attachment" "node_ebs" {
+  role       = aws_iam_role.node_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+}
+
+############################
+# EKS CLUSTER
+############################
+
+resource "aws_eks_cluster" "eks" {
+  name     = var.cluster_name
+  role_arn = aws_iam_role.cluster_role.arn
+
+  vpc_config {
+    subnet_ids              = aws_subnet.eks_subnet[*].id
+    security_group_ids      = [aws_security_group.cluster_sg.id]
+    endpoint_public_access  = true
+    endpoint_private_access = false
+  }
+
+  depends_on = [aws_iam_role_policy_attachment.cluster_policy]
+}
+
+############################
+# NODE GROUP (t2.small)
+############################
+
+resource "aws_eks_node_group" "nodes" {
+  cluster_name    = aws_eks_cluster.eks.name
+  node_group_name = "${var.cluster_name}-nodes"
+  node_role_arn   = aws_iam_role.node_role.arn
+  subnet_ids      = aws_subnet.eks_subnet[*].id
+
+  scaling_config {
+    desired_size = 1
+    max_size     = 1
+    min_size     = 1
+  }
+
+  instance_types = ["t2.small"]
+
+  remote_access {
+    ec2_ssh_key = var.ssh_key_name
+    source_security_group_ids = [aws_security_group.node_sg.id]
+  }
+
+  depends_on = [
+    aws_iam_role_policy_attachment.node_worker,
+    aws_iam_role_policy_attachment.node_cni,
+    aws_iam_role_policy_attachment.node_ecr
+  ]
+}
+
+############################
+# EBS CSI ADDON
+############################
+
+resource "aws_eks_addon" "ebs_csi" {
+  cluster_name = aws_eks_cluster.eks.name
+  addon_name   = "aws-ebs-csi-driver"
+
+  resolve_conflicts_on_create = "OVERWRITE"
+  resolve_conflicts_on_update = "OVERWRITE"
+}
